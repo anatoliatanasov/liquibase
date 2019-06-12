@@ -1,15 +1,10 @@
 package liquibase.database.core;
 
-import liquibase.changelog.DatabaseChangeLog;
 import liquibase.database.AbstractJdbcDatabaseTest;
 import liquibase.database.Database;
 import liquibase.database.OfflineConnection;
-import liquibase.exception.DatabaseException;
 import liquibase.resource.ClassLoaderResourceAccessor;
-import liquibase.snapshot.DatabaseSnapshot;
-import liquibase.snapshot.EmptyDatabaseSnapshot;
 import org.junit.Test;
-
 import static org.junit.Assert.*;
 
 /**
