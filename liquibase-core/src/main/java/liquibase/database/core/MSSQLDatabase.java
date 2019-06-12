@@ -113,10 +113,70 @@ public class MSSQLDatabase extends AbstractJdbcDatabase {
     @Override
     public void setDefaultSchemaName(String schemaName) {
         if (schemaName != null && !schemaName.equalsIgnoreCase(getConnectionSchemaName())) {
-            throw new RuntimeException(String.format(
-                "Cannot use default schema name %s on Microsoft SQL Server because the login " +
-                    "schema of the current user (%s) is different and MSSQL does not support " +
-                    "setting the default schema per session.", schemaName, getConnectionSchemaName()));
+            //Fixed in: v3.6.5-SNAPSHOT
+            //Fixed by: anatoli@atanasov.name
+            //Fixed on: 12.06.2019
+            //Cause: When running in offline mode to generate script, i.e. using the updateSQL command
+            //       Liquibase generates invalid script in the are of comments and remarks at both table
+            //       and column levels.
+            //       The script generated to set comment on a table was:
+            //              DECLARE @TableName SYSNAME set @TableName = N'C_COUNTRY_ZONE';
+            //              DECLARE @FullTableName SYSNAME;
+            //              SET @FullTableName = N'dbo.C_COUNTRY_ZONE';
+            //              DECLARE @MS_DescriptionValue NVARCHAR(3749);
+            //              SET @MS_DescriptionValue = N'Some comment.';
+            //              DECLARE @MS_Description NVARCHAR(3749) set @MS_Description = NULL;
+            //              SET @MS_Description = (SELECT CAST(Value AS NVARCHAR(3749)) AS [MS_Description]
+            //                                      FROM sys.extended_properties AS ep
+            //                                      WHERE ep.major_id = OBJECT_ID(@FullTableName) AND ep.name = N'MS_Description' AND ep.minor_id=0);
+            //              IF @MS_Description IS NULL
+            //              BEGIN
+            //                  EXEC sys.sp_addextendedproperty @name  = N'MS_Description', @value = @MS_DescriptionValue, @level0type = N'SCHEMA',
+            //                                                  @level0name = N'dbo', @level1type = N'TABLE', @level1name = @TableName;
+            //              END
+            //              ELSE
+            //              BEGIN
+            //                  EXEC sys.sp_updateextendedproperty @name  = N'MS_Description', @value = @MS_DescriptionValue, @level0type = N'SCHEMA',
+            //                                                  @level0name = N'dbo', @level1type = N'TABLE', @level1name = @TableName;
+            //              END
+            //              GO
+            //
+            //      The script generated for setting column level comments / remarks was:
+            //              DECLARE @TableName SYSNAME set @TableName = N'C_COUNTRY_ZONE';
+            //              DECLARE @FullTableName SYSNAME set @FullTableName = N'dbo.C_COUNTRY_ZONE';
+            //              DECLARE @ColumnName SYSNAME set @ColumnName = N'ID';
+            //              DECLARE @MS_DescriptionValue NVARCHAR(3749);
+            //              SET @MS_DescriptionValue = N'Unique system number';
+            //              DECLARE @MS_Description NVARCHAR(3749) set @MS_Description = NULL;
+            //              SET @MS_Description = (SELECT CAST(Value AS NVARCHAR(3749)) AS [MS_Description]
+            //                                      FROM sys.extended_properties AS ep
+            //                                      WHERE ep.major_id = OBJECT_ID(@FullTableName)
+            //                                          AND ep.minor_id=COLUMNPROPERTY(ep.major_id, @ColumnName, 'ColumnId')
+            //                                          AND ep.name = N'MS_Description');
+            //              IF @MS_Description IS NULL
+            //              BEGIN
+            //                  EXEC sys.sp_addextendedproperty @name  = N'MS_Description', @value = @MS_DescriptionValue, @level0type = N'SCHEMA',
+            //                                                  @level0name = N'dbo', @level1type = N'TABLE', @level1name = @TableName,
+            //                                                  @level2type = N'COLUMN', @level2name = @ColumnName;
+            //              END
+            //              ELSE
+            //                  BEGIN EXEC sys.sp_updateextendedproperty @name  = N'MS_Description', @value = @MS_DescriptionValue, @level0type = N'SCHEMA',
+            //                                                          @level0name = N'dbo', @level1type = N'TABLE', @level1name = @TableName, @level2type = N'COLUMN',
+            //                                                          @level2name = @ColumnName;
+            //              END
+            //              GO
+            //
+            //      The main issue with the scripts above is the default dbo schema used in the @level0name parameters,
+            //      causing the generated scripts execution in the RDBMS to fail.
+            //
+            //      Setting the --defaultSchemaName in the Liquibase startup arguments list in offline mode was leading to
+            //      RuntimeException thrown below.
+            if(!(getConnection() instanceof OfflineConnection)) {
+                throw new RuntimeException(String.format(
+                        "Cannot use default schema name %s on Microsoft SQL Server because the login " +
+                                "schema of the current user (%s) is different and MSSQL does not support " +
+                                "setting the default schema per session.", schemaName, getConnectionSchemaName()));
+            }
         }
         super.setDefaultSchemaName(schemaName);
     }

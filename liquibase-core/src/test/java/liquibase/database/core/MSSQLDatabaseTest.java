@@ -1,7 +1,13 @@
 package liquibase.database.core;
 
+import liquibase.changelog.DatabaseChangeLog;
 import liquibase.database.AbstractJdbcDatabaseTest;
 import liquibase.database.Database;
+import liquibase.database.OfflineConnection;
+import liquibase.exception.DatabaseException;
+import liquibase.resource.ClassLoaderResourceAccessor;
+import liquibase.snapshot.DatabaseSnapshot;
+import liquibase.snapshot.EmptyDatabaseSnapshot;
 import org.junit.Test;
 
 import static org.junit.Assert.*;
@@ -121,5 +127,27 @@ public class MSSQLDatabaseTest extends AbstractJdbcDatabaseTest {
         assertEquals("int", database.unescapeDataTypeString("[int]"));
         assertEquals("decimal(19, 2)", database.unescapeDataTypeString("decimal(19, 2)"));
         assertEquals("decimal(19, 2)", database.unescapeDataTypeString("[decimal](19, 2)"));
+    }
+
+    /**
+     * Verifies the case of setting the {@link MSSQLDatabase#setDefaultSchemaName(String)}
+     * when using {@link OfflineConnection}.
+     */
+    @Test
+    public void testSetDefaultSchemaNameOnOfflineConnection() {
+        Database database = getDatabase();
+        OfflineConnection offlineConnection = new OfflineConnection("offline:mssql?outputLiquibaseSql=all&changeLogFile=liquibase/database/simpleChangeLog.xml", new ClassLoaderResourceAccessor());
+        database.setConnection(offlineConnection);
+
+        try {
+            database.setDefaultSchemaName("SCHEMA_NAME");
+            assertEquals("SCHEMA_NAME", database.getDefaultSchemaName());
+        } catch (Exception rte) {
+            assertNull(rte);
+//            assertTrue(rte instanceof  RuntimeException);
+//            assertTrue(rte.getMessage().contains("Cannot use default schema name SCHEMA_NAME on Microsoft SQL Server"));
+//            throw (RuntimeException)rte;
+        }
+
     }
 }
